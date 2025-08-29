@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2><i class="fas fa-chart-line me-2"></i>Hotel Data Analysis</h2>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                <i class="fas fa-upload me-2"></i>Upload New File
+            </a>
+        </div>
+        <p class="text-muted">Hierarchical view: Hotels → Months → Business Segments → Daily Details</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        {% for hotel_name, months_data in data.items() %}
+        <div class="card hotel-card shadow-sm">
+            <div class="card-header" data-bs-toggle="collapse" data-bs-target="#hotel-{{ loop.index }}" aria-expanded="true">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-hotel me-2 text-primary"></i>{{ hotel_name }}
+                    </h4>
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-primary me-2">{{ months_data|length }} months</span>
+                        <i class="fas fa-chevron-down collapse-icon"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="collapse show" id="hotel-{{ loop.index }}">
+                <div class="card-body">
+                    {% for month_name, segments_data in months_data.items() %}
+                    <div class="card month-card mb-3">
+                        <div class="card-header" data-bs-toggle="collapse" data-bs-target="#month-{{ loop.index0 }}-{{ loop.index }}" aria-expanded="false">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-calendar me-2 text-success"></i>{{ month_name }}
+                                </h5>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-success me-2">{{ segments_data|length }} segments</span>
+                                    <i class="fas fa-chevron-down collapse-icon"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="collapse" id="month-{{ loop.index0 }}-{{ loop.index }}">
+                            <div class="card-body">
+                                {% for segment_name, days_data in segments_data.items() %}
+                                <div class="card segment-card mb-2">
+                                    <div class="card-header" data-bs-toggle="collapse" data-bs-target="#segment-{{ loop.index0 }}-{{ loop.index0 }}-{{ loop.index }}" aria-expanded="false">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-tags me-2 text-warning"></i>{{ segment_name }}
+                                            </h6>
+                                            <div class="d-flex align-items-center">
+                                                <span class="badge bg-warning text-dark me-2">{{ days_data|length }} days</span>
+                                                <i class="fas fa-chevron-down collapse-icon"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="collapse" id="segment-{{ loop.index0 }}-{{ loop.index0 }}-{{ loop.index }}">
+                                        <div class="card-body p-2">
+                                            {% if days_data %}
+                                            <!-- Summary Stats -->
+                                            {% set total_occupancy = days_data|sum(attribute='occupancy_on_books') %}
+                                            {% set total_revenue = days_data|sum(attribute='booked_room_revenue') %}
+                                            {% set total_arrivals = days_data|sum(attribute='arrivals') %}
+                                            {% set total_departures = days_data|sum(attribute='departures') %}
+                                            
+                                            <div class="row mb-3">
+                                                <div class="col-md-3">
+                                                    <div class="card summary-stats">
+                                                        <div class="card-body text-center p-2">
+                                                            <h6 class="mb-1">Total Occupancy</h6>
+                                                            <h4 class="mb-0">{{ total_occupancy|format_number }}</h4>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="card summary-stats">
+                                                        <div class="card-body text-center p-2">
+                                                            <h6 class="mb-1">Total Revenue</h6>
+                                                            <h4 class="mb-0">{{ total_revenue|format_currency }}</h4>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="card summary-stats">
+                                                        <div class="card-body text-center p-2">
+                                                            <h6 class="mb-1">Total Arrivals</h6>
+                                                            <h4 class="mb-0">{{ total_arrivals|format_number }}</h4>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="card summary-stats">
+                                                        <div class="card-body text-center p-2">
+                                                            <h6 class="mb-1">Total Departures</h6>
+                                                            <h4 class="mb-0">{{ total_departures|format_number }}</h4>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Detailed Daily Data -->
+                                            <div class="table-responsive">
+                                                <table class="table table-striped table-hover data-table">
+                                                    <thead class="table-dark">
+                                                        <tr>
+                                                            <th>Date</th>
+                                                            <th>Day</th>
+                                                            <th>Occupancy</th>
+                                                            <th>Revenue</th>
+                                                            <th>ADR</th>
+                                                            <th>Arrivals</th>
+                                                            <th>Departures</th>
+                                                            <th>Cancelled</th>
+                                                            <th>No Show</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for day_data in days_data %}
+                                                        <tr>
+                                                            <td>{{ day_data.occupancy_date }}</td>
+                                                            <td>
+                                                                <span class="badge bg-secondary">{{ day_data.day_of_week }}</span>
+                                                            </td>
+                                                            <td class="fw-bold">{{ day_data.occupancy_on_books|format_number }}</td>
+                                                            <td class="text-success fw-bold">{{ day_data.booked_room_revenue|format_currency }}</td>
+                                                            <td>{{ day_data.adr_on_books|format_currency }}</td>
+                                                            <td class="text-primary">{{ day_data.arrivals|format_number }}</td>
+                                                            <td class="text-info">{{ day_data.departures|format_number }}</td>
+                                                            <td class="text-warning">{{ day_data.cancelled|format_number }}</td>
+                                                            <td class="text-danger">{{ day_data.no_show|format_number }}</td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if not data %}
+<div class="row">
+    <div class="col-12 text-center">
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            No data found in the uploaded file. Please check the file format and try again.
+        </div>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
+            <i class="fas fa-upload me-2"></i>Try Again
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Add smooth scrolling and enhanced collapse behavior
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add click handlers for all collapse triggers
+        const collapseElements = document.querySelectorAll('[data-bs-toggle="collapse"]');
+        
+        collapseElements.forEach(element => {
+            element.addEventListener('click', function(e) {
+                const icon = this.querySelector('.collapse-icon');
+                if (icon) {
+                    // Toggle the collapsed class for icon animation
+                    setTimeout(() => {
+                        const target = document.querySelector(this.getAttribute('data-bs-target'));
+                        if (target && target.classList.contains('show')) {
+                            this.classList.remove('collapsed');
+                        } else {
+                            this.classList.add('collapsed');
+                        }
+                    }, 10);
+                }
+            });
+        });
+        
+        // Initialize all collapse icons to collapsed state except hotels
+        collapseElements.forEach((element, index) => {
+            if (!element.closest('.hotel-card')) {
+                element.classList.add('collapsed');
+            }
+        });
+    });
+</script>
+{% endblock %}
