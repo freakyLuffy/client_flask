@@ -1,57 +1,22 @@
 {% extends 'base.html' %}
-
 {% block content %}
 <style>
-    .summary-container {
-        max-width: 1000px;
-        margin: 2em auto;
-        padding: 1em;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    th, td {
-        border-bottom: 1px solid #e0e0e0;
-        padding: 12px 15px;
-        text-align: left;
-    }
-    th {
-        background-color: #f9f9f9;
-        font-weight: 600;
-        color: #333;
-    }
-    tr:last-child td {
-        border-bottom: none;
-    }
-    tr:hover {
-        background-color: #f5f5f5;
-    }
-    td a {
-        text-decoration: none;
-        color: #007bff;
-        font-weight: 500;
-    }
-    td a:hover {
-        text-decoration: underline;
-    }
-    .text-right {
-        text-align: right;
-        font-family: monospace, sans-serif;
-    }
-    .upload-link {
-        display: block;
-        margin-top: 2em;
-        text-align: center;
-        color: #555;
-    }
+    .summary-container { max-width: 1000px; margin: 2em auto; padding: 1em; }
+    .summary-header { margin-bottom: 1.5em; }
+    .summary-header h1 { margin: 0; }
+    .summary-header a { color: #555; text-decoration: none; }
+    table { width: 100%; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.07); border-radius: 8px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #e0e0e0; padding: 12px 15px; text-align: left; }
+    th { background-color: #f9f9f9; }
+    tr:hover { background-color: #f5f5f5; }
+    td a { text-decoration: none; color: #007bff; font-weight: 500; }
+    .text-right { text-align: right; }
 </style>
-
 <div class="summary-container">
-    <h1>{% block title %}Hotel Performance Summary{% endblock %}</h1>
+    <div class="summary-header">
+        <a href="{{ url_for('dashboard_index') }}">&larr; Back to Dashboard Index</a>
+        <h1>{% block title %}Summary: {{ filename }}{% endblock %}</h1>
+    </div>
     <table>
         <thead>
             <tr>
@@ -64,11 +29,7 @@
         <tbody>
             {% for row in summary_data %}
             <tr>
-                <td>
-                    <a href="{{ url_for('hotel_detail', hotel_name=row['Property Name']) }}">
-                        {{ row['Property Name'] }}
-                    </a>
-                </td>
+                <td><a href="{{ url_for('hotel_detail', filename=filename, hotel_name=row['Property Name']) }}">{{ row['Property Name'] }}</a></td>
                 <td class="text-right">{{ "{:,.0f}".format(row['Occupancy On Books This Year']) }}</td>
                 <td class="text-right">{{ "{:,.2f}".format(row['Booked Room Revenue This Year']) }}</td>
                 <td class="text-right">{{ "{:,.2f}".format(row['ADR On Books This Year']) }}</td>
@@ -76,6 +37,5 @@
             {% endfor %}
         </tbody>
     </table>
-    <a href="{{ url_for('index') }}" class="upload-link">Upload a different file</a>
 </div>
 {% endblock %}

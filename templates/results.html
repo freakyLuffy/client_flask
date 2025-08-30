@@ -83,7 +83,6 @@
     details[open] > summary { border-bottom: 1px solid var(--border-color); }
     details[open] > summary::before { transform: rotate(90deg); }
     
-    /* NEW styles for the monthly totals grid */
     .monthly-totals-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -91,12 +90,8 @@
         padding: 1.5em;
         border-bottom: 1px solid var(--border-color);
     }
-    .monthly-totals-grid .total-card {
-        padding: 0.8em;
-    }
-    .monthly-totals-grid .total-card p {
-        font-size: 1.5em;
-    }
+    .monthly-totals-grid .total-card { padding: 0.8em; }
+    .monthly-totals-grid .total-card p { font-size: 1.5em; }
 
     .table-container { overflow-x: auto; padding: 1em; }
     table { width: 100%; border-collapse: collapse; }
@@ -106,8 +101,8 @@
 </style>
 
 <div class="detail-header">
+    <a href="{{ url_for('summary', filename=filename) }}">&larr; Back to Summary for {{ filename }}</a>
     <h1>{% block title %}{{ hotel_data.name }}{% endblock %}</h1>
-    <a href="{{ url_for('summary') }}">&larr; Back to Summary</a>
 </div>
 
 <div class="totals-grid">
