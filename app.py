@@ -1,78 +1,84 @@
 # freakyluffy/client_flask/client_flask-d6698893f32401e64d38b73f4ecd0c16c7652afe/app.py
 from flask import Flask, render_template, request, redirect, url_for
 import pandas as pd
+from urllib.parse import unquote
 
 app = Flask(__name__)
 
 # --- In-memory data storage ---
-df_store = None
+dashboards_store = {}
 
 @app.route('/')
 def index():
-    """Renders the main page with the file upload form."""
-    return render_template('index.html')
+    """Renders the upload page."""
+    return render_template('index.html', dashboards_exist=bool(dashboards_store))
 
 @app.route('/process', methods=['POST'])
 def process_file():
-    """
-    Handles the uploaded file, loads it into the in-memory store,
-    and redirects to the summary view.
-    """
-    global df_store
+    """Processes uploaded files and adds them as new, separate dashboards."""
+    global dashboards_store
     
-    if 'file' not in request.files or not request.files['file'].filename:
-        return "Error: No file was selected.", 400
+    uploaded_files = request.files.getlist("file")
+    if not uploaded_files or all(f.filename == '' for f in uploaded_files):
+        return "Error: No files were selected.", 400
 
-    file = request.files['file']
-    if not (file.filename.lower().endswith('.xlsx') or file.filename.lower().endswith('.xls')):
-        return "Error: Please upload a valid Excel file (.xlsx or .xls).", 400
+    for file in uploaded_files:
+        if file and (file.filename.lower().endswith('.xlsx') or file.filename.lower().endswith('.xls')):
+            try:
+                df = pd.read_excel(file, engine='openpyxl')
+                df.columns = df.columns.str.strip()
+                df['Occupancy Date'] = pd.to_datetime(df['Occupancy Date'])
+                dashboards_store[file.filename] = df
+            except Exception as e:
+                return f"An error occurred while processing '{file.filename}': {e}", 500
+    
+    return redirect(url_for('dashboard_index'))
 
-    try:
-        df_store = pd.read_excel(file, engine='openpyxl')
-        df_store.columns = df_store.columns.str.strip()
-        df_store['Occupancy Date'] = pd.to_datetime(df_store['Occupancy Date'])
-        return redirect(url_for('summary'))
-    except Exception as e:
-        return f"An error occurred while processing the file: {e}", 500
+@app.route('/dashboards')
+def dashboard_index():
+    """Shows a list of all uploaded dashboards."""
+    return render_template('dashboards.html', dashboard_names=list(dashboards_store.keys()))
 
-@app.route('/summary')
-def summary():
-    """Displays the high-level summary table of all hotels."""
-    if df_store is None:
-        return redirect(url_for('index'))
+@app.route('/summary/<path:filename>')
+def summary(filename):
+    """Displays the summary view for a SINGLE dashboard."""
+    filename = unquote(filename)
+    df = dashboards_store.get(filename)
+    if df is None: return "Error: Dashboard not found.", 404
     
     try:
+        df_copy = df.copy()
         summary_cols = ['Occupancy On Books This Year', 'Booked Room Revenue This Year']
         for col in summary_cols:
-            if col in df_store.columns:
-                df_store[col] = pd.to_numeric(df_store[col], errors='coerce').fillna(0)
+            if col in df_copy.columns:
+                df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0)
             else:
-                return f"Error: Required column '{col}' not found in the file.", 400
+                return f"Error: Required column '{col}' not found in '{filename}'.", 400
 
-        summary_data = df_store.groupby('Property Name').agg({
+        summary_data = df_copy.groupby('Property Name').agg({
             'Occupancy On Books This Year': 'sum',
             'Booked Room Revenue This Year': 'sum'
         }).reset_index()
 
         summary_data['ADR On Books This Year'] = summary_data.apply(
-            lambda row: (row['Booked Room Revenue This Year'] / row['Occupancy On Books This Year']) 
-                        if row['Occupancy On Books This Year'] != 0 else 0,
+            lambda row: (row['Booked Room Revenue This Year'] / row['Occupancy On Books This Year']) if row['Occupancy On Books This Year'] != 0 else 0,
             axis=1
         )
-        return render_template('summary.html', summary_data=summary_data.to_dict(orient='records'))
+        return render_template('summary.html', summary_data=summary_data.to_dict(orient='records'), filename=filename)
     except Exception as e:
-        return f"An error occurred while creating the summary: {e}", 500
+        return f"An error occurred creating the summary for '{filename}': {e}", 500
 
-@app.route('/hotel/<hotel_name>')
-def hotel_detail(hotel_name):
-    """Displays the detailed, monthly breakdown for a single, selected hotel."""
-    if df_store is None:
-        return redirect(url_for('index'))
+@app.route('/hotel/<path:filename>/<hotel_name>')
+def hotel_detail(filename, hotel_name):
+    """Displays the detailed view for a specific hotel from a specific dashboard."""
+    filename = unquote(filename)
+    hotel_name = unquote(hotel_name)
+    df = dashboards_store.get(filename)
+    if df is None: return "Error: Dashboard not found.", 404
 
     try:
-        hotel_df = df_store[df_store['Property Name'] == hotel_name].copy()
-        if hotel_df.empty:
-            return "Error: Hotel not found.", 404
+        hotel_df = df[df['Property Name'] == hotel_name].copy()
+        if hotel_df.empty: return "Error: Hotel not found.", 404
 
         sum_cols = ['Booked Room Revenue ST2Y', 'Forecasted Room Revenue This Year', 'Occupancy Forecast This Year']
         for col in sum_cols:
@@ -82,14 +88,13 @@ def hotel_detail(hotel_name):
                 hotel_df[col] = 0
 
         hotel_df['Month'] = hotel_df['Occupancy Date'].dt.strftime('%B')
-        
-        # Calculate overall totals for the hotel
         overall_totals = {
             'total_revenue_st2y': hotel_df['Booked Room Revenue ST2Y'].sum(),
             'total_forecast_revenue': hotel_df['Forecasted Room Revenue This Year'].sum(),
             'total_occupancy_forecast': hotel_df['Occupancy Forecast This Year'].sum()
         }
-
+        
+        # Ensures months are always sorted chronologically
         month_order = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
         hotel_df['Month'] = pd.Categorical(hotel_df['Month'], categories=month_order, ordered=True)
         hotel_df = hotel_df.sort_values(by=['Month', 'Occupancy Date'])
@@ -97,17 +102,12 @@ def hotel_detail(hotel_name):
         monthly_data = {}
         grouped = hotel_df.groupby('Month', observed=False)
         for name, group in grouped:
-            # *** NEW: Calculate totals for each month ***
             monthly_totals = {
                 'month_revenue_st2y': group['Booked Room Revenue ST2Y'].sum(),
                 'month_forecast_revenue': group['Forecasted Room Revenue This Year'].sum(),
                 'month_occupancy_forecast': group['Occupancy Forecast This Year'].sum()
             }
-            # *** Store both monthly totals and daily records ***
-            monthly_data[name] = {
-                'totals': monthly_totals,
-                'records': group.to_dict(orient='records')
-            }
+            monthly_data[name] = {'totals': monthly_totals, 'records': group.to_dict(orient='records')}
         
         detail_data = {
             'name': hotel_name,
@@ -115,11 +115,16 @@ def hotel_detail(hotel_name):
             'monthly_data': monthly_data,
             'columns': hotel_df.columns.tolist()
         }
-        
-        return render_template('results.html', hotel_data=detail_data)
-
+        return render_template('results.html', hotel_data=detail_data, filename=filename)
     except Exception as e:
-        return f"An error occurred while generating the detail view: {e}", 500
+        return f"An error occurred generating the detail view: {e}", 500
+
+@app.route('/reset')
+def reset_data():
+    """Clears all stored dashboards."""
+    global dashboards_store
+    dashboards_store = {}
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     app.run(debug=True)
