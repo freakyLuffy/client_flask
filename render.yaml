@@ -2,12 +2,11 @@ services:
   - type: web
     name: hotel-hierarchy-app
     env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn --workers 4 --bind 0.0.0.0:$PORT app:app"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.7
       - key: FLASK_ENV
         value: production
     healthCheckPath: /
-    plan: free
