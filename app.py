@@ -162,6 +162,10 @@ def reset_data():
     df_store = None
     return redirect(url_for('index'))
 
+# if __name__ == '__main__':
+#     # For local development
+#     app.run(debug=True)
+
 if __name__ == '__main__':
     # For Render deployment
     port = int(os.environ.get('PORT', 5000))
