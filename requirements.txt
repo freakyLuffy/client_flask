@@ -5,3 +5,4 @@ Werkzeug==3.0.1
 numpy
 gunicorn==22.0.0
 pymongo[srv]==4.6.1
+python-dotenv==1.0.1
