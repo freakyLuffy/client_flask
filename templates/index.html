@@ -1,38 +1,187 @@
 {% extends 'base.html' %}
 {% block content %}
 <style>
-    .upload-container { max-width: 600px; margin: 4em auto; padding: 2em; background-color: #fff; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; }
-    h1 { margin-bottom: 1em; }
-    .form-group { margin-bottom: 1.5em; }
+    body, html {
+        background-color: #f0f2f5;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .upload-container {
+        max-width: 550px;
+        margin: 5em auto;
+        padding: 2.5em;
+        background-color: #fff;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+        text-align: center;
+        border: 1px solid #e8e8e8;
+    }
+    h1 {
+        font-size: 1.8em;
+        color: #333;
+        font-weight: 600;
+        margin-bottom: 0.5em;
+    }
+    p {
+        color: #666;
+        margin-bottom: 2em;
+        font-size: 1.05em;
+    }
+    .custom-file-upload {
+        border: 2px dashed #d0d0d0;
+        border-radius: 12px;
+        display: block;
+        padding: 2.5em;
+        cursor: pointer;
+        background-color: #f9f9f9;
+        transition: background-color 0.2s, border-color 0.2s;
+    }
+    .custom-file-upload:hover {
+        background-color: #f0f8ff;
+        border-color: #007bff;
+    }
+    #file-name {
+        margin-top: 1em;
+        font-style: italic;
+        color: #555;
+        font-weight: 500;
+    }
     input[type="file"] { display: none; }
-    .custom-file-upload { border: 2px dashed #007bff; border-radius: 6px; display: block; padding: 40px 20px; cursor: pointer; background-color: #f9f9f9; }
-    #file-name { margin-top: 10px; font-style: italic; color: #555; }
-    button[type="submit"] { background-color: #007bff; color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; margin-top: 1em; }
-    .nav-link { margin-top: 1.5em; display: inline-block; }
+    button[type="submit"] {
+        background: #007bff;
+        color: white;
+        padding: 14px 25px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1.1em;
+        font-weight: 500;
+        width: 100%;
+        margin-top: 1em;
+        transition: background-color 0.2s, transform 0.2s;
+    }
+    button[type="submit"]:hover {
+        background-color: #0056b3;
+        transform: translateY(-2px);
+    }
+    .reset-link {
+        color: #6c757d;
+        margin-top: 1.5em;
+        display: inline-block;
+        text-decoration: none;
+    }
+    /* Processing Overlay Styles */
+    .processing-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        font-size: 1.2em;
+        color: #333;
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s;
+    }
+    .processing-overlay.active {
+        visibility: visible;
+        opacity: 1;
+    }
+    .loader {
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #007bff;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 1.5em;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
 </style>
+
 <div class="upload-container">
-    <h1>{% block title %}Upload Hotel Data{% endblock %}</h1>
-    <form method="post" action="{{ url_for('process_file') }}" enctype="multipart/form-data">
+    <h1>Generate Portfolio Report</h1>
+    <p>Upload a single Excel file (<b>.xlsx</b> or <b>.xls</b>) to generate your report.</p>
+    <form id="upload-form">
         <div class="form-group">
             <label for="file" class="custom-file-upload">
-                Click to select one or more Excel files
-                <div id="file-name">No files chosen</div>
+                Click to select an Excel file
+                <div id="file-name">No file chosen</div>
             </label>
-            <input type="file" name="file" id="file" accept=".xlsx, .xls" required multiple>
+            <input type="file" name="file" id="file" accept=".xlsx, .xls" required>
         </div>
-        <button type="submit">Generate Dashboard</button>
+        <button type="submit">Upload & Generate Report</button>
     </form>
-    {% if dashboards_exist %}
-    <a href="{{ url_for('main_dashboard') }}" class="nav-link">View Existing Dashboard</a>
+    {% if data_exists %}
+    <a href="{{ url_for('reset_data') }}" class="reset-link">Clear Previous Data</a>
     {% endif %}
 </div>
+
+<div class="processing-overlay" id="processing-overlay">
+    <div class="loader"></div>
+    <div>Processing your files... Please wait.</div>
+</div>
+
 <script>
 document.getElementById('file').onchange = function () {
     const fileCount = this.files.length;
     const fileNameDisplay = document.getElementById('file-name');
-    if (fileCount === 0) { fileNameDisplay.textContent = "No files chosen"; } 
-    else if (fileCount === 1) { fileNameDisplay.textContent = this.files[0].name; } 
-    else { fileNameDisplay.textContent = `${fileCount} files selected`; }
+    if (fileCount === 0) { fileNameDisplay.textContent = "No file chosen"; } 
+    else { fileNameDisplay.textContent = this.files[0].name; }
+};
+
+// This script handles the form submission and shows the processing overlay
+document.getElementById('upload-form').onsubmit = function (e) {
+    e.preventDefault();
+    const overlay = document.getElementById('processing-overlay');
+    const files = document.getElementById('file').files;
+
+    if (files.length === 0) {
+        alert("Please select an Excel file to upload.");
+        return;
+    }
+    if (files.length > 1) {
+        overlay.classList.remove('active');
+        alert("Please upload only one Excel file.");
+        return;
+    }
+
+    // Show the processing overlay
+    overlay.classList.add('active');
+
+    // Prepare form data for submission
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('file', files[i]);
+    }
+
+    // Submit the data using Fetch API
+    fetch("{{ url_for('process_file') }}", {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        // If the server responds with a redirect, follow it
+        if (response.redirected) {
+            window.location.href = response.url;
+        } else {
+            // If there was an error, show it to the user
+            return response.text().then(text => {
+                overlay.classList.remove('active');
+                alert("An error occurred: " + text);
+            });
+        }
+    })
+    .catch(error => {
+        // Handle network errors
+        overlay.classList.remove('active');
+        alert('A network error occurred: ' + error);
+    });
 };
 </script>
 {% endblock %}

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotel Dashboard</title>
+    <style>
+        :root {
+            --border-color: #e0e0e0;
+            --header-bg: #f7f7f7;
+            --card-bg: #ffffff;
+            --shadow: 0 2px 5px rgba(0,0,0,0.05);
+            --primary-text: #333;
+            --secondary-text: #555;
+            --accent-color: #007bff;
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            margin: 2em; 
+            background-color: #fcfcfc;
+            color: var(--primary-text);
+        }
+
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2em;
+            padding: 1.5em;
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .export-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+
+        .export-btn::before {
+            content: "📊";
+            font-size: 16px;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--primary-text);
+        }
+
+        .totals-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5em;
+            padding: 1.5em;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 1.5em;
+            box-shadow: var(--shadow);
+        }
+
+        .total-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1em;
+            text-align: center;
+        }
+
+        .total-card h4 {
+            margin: 0 0 0.5em 0;
+            font-size: 0.9em;
+            font-weight: 500;
+            color: var(--secondary-text);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .total-card p {
+            margin: 0;
+            font-size: 1.8em;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        .metric-change {
+            font-size: 0.8em;
+            margin-top: 0.5em;
+            font-weight: 500;
+        }
+
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+
+        details {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 1em;
+            box-shadow: var(--shadow);
+        }
+
+        summary {
+            font-weight: bold;
+            padding: 1em 1.5em;
+            cursor: pointer;
+            outline: none;
+            background: var(--header-bg);
+            border-radius: 8px 8px 0 0;
+        }
+
+        summary::-webkit-details-marker { display: none; }
+        
+        summary::before {
+            content: '▶';
+            margin-right: 0.75em;
+            display: inline-block;
+            transition: transform 0.2s;
+            font-size: 0.8em;
+        }
+
+        details[open] > summary { 
+            border-bottom: 1px solid var(--border-color); 
+            border-radius: 8px 8px 0 0;
+        }
+        
+        details[open] > summary::before { 
+            transform: rotate(90deg); 
+        }
+
+        .monthly-totals-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1em;
+            padding: 1.5em;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .monthly-totals-grid .total-card { 
+            padding: 0.8em; 
+        }
+
+        .monthly-totals-grid .total-card p { 
+            font-size: 1.5em; 
+        }
+
+        .business-view-section {
+            margin-top: 1em;
+        }
+
+        .business-view-details {
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin: 0.5em 0;
+        }
+
+        .business-view-summary {
+            padding: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .business-view-metrics {
+            display: flex;
+            gap: 1em;
+            font-size: 0.9em;
+            color: var(--secondary-text);
+        }
+
+        .table-container { 
+            overflow-x: auto; 
+            padding: 1em; 
+        }
+
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+
+        th, td { 
+            border: 1px solid var(--border-color); 
+            padding: 10px 12px; 
+            text-align: left; 
+            white-space: nowrap; 
+        }
+
+        th { 
+            background-color: var(--header-bg); 
+            position: sticky; 
+            top: 0; 
+            z-index: 1;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) { 
+            background-color: #f9f9f9; 
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2em;
+            color: var(--secondary-text);
+        }
+
+        .loading.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-controls">
+        <h1>Hotel Portfolio Dashboard</h1>
+        <div>
+            <a href="/reset" onclick="return confirm('Are you sure you want to clear all data?')" 
+               style="margin-right: 1em; color: #dc3545; text-decoration: none;">Clear Data</a>
+            <a href="/export-excel" class="export-btn" onclick="showLoading()">
+                Export to Excel
+            </a>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">
+        <p>📊 Generating Excel file... Please wait.</p>
+    </div>
+
+    <!-- Portfolio Totals -->
+    <div class="totals-grid">
+        <div class="total-card">
+            <h4>Portfolio Occupancy</h4>
+            <p>{{ "{:.1f}%".format(data.metrics.occ_percent) }}</p>
+            <div class="metric-change {{ 'positive' if data.metrics.occ_vs_ly > 0 else 'negative' if data.metrics.occ_vs_ly < 0 else 'neutral' }}">
+                {{ "{:+.1f}%".format(data.metrics.occ_vs_ly) }} vs Last Year
+            </div>
+        </div>
+        <div class="total-card">
+            <h4>Total Forecast Revenue</h4>
+            <p>${{ "{:,.0f}".format(data.metrics.forecast_rev) }}</p>
+        </div>
+        <div class="total-card">
+            <h4>Active Hotels</h4>
+            <p>{{ data.children|length }}</p>
+        </div>
+    </div>
+
+    <!-- Hotels -->
+    {% for hotel in data.children %}
+    <details>
+        <summary>
+            <span>{{ hotel.name }}</span>
+            <div style="float: right; font-size: 0.9em; color: var(--secondary-text);">
+                Occupancy: {{ "{:.1f}%".format(hotel.metrics.occ_percent) }} | 
+                Revenue: ${{ "{:,.0f}".format(hotel.metrics.forecast_rev) }}
+            </div>
+        </summary>
+        
+        <!-- Hotel Totals -->
+        <div class="totals-grid">
+            <div class="total-card">
+                <h4>Hotel Occupancy</h4>
+                <p>{{ "{:.1f}%".format(hotel.metrics.occ_percent) }}</p>
+                <div class="metric-change {{ 'positive' if hotel.metrics.occ_vs_ly > 0 else 'negative' if hotel.metrics.occ_vs_ly < 0 else 'neutral' }}">
+                    {{ "{:+.1f}%".format(hotel.metrics.occ_vs_ly) }} vs Last Year
+                </div>
+            </div>
+            <div class="total-card">
+                <h4>Forecast Revenue</h4>
+                <p>${{ "{:,.0f}".format(hotel.metrics.forecast_rev) }}</p>
+            </div>
+            <div class="total-card">
+                <h4>Active Months</h4>
+                <p>{{ hotel.children|length }}</p>
+            </div>
+        </div>
+
+        <!-- Months -->
+        {% for month in hotel.children %}
+        <details>
+            <summary style="margin-left: 1em; font-size: 0.95em;">
+                <span>📅 {{ month.name }}</span>
+                <div style="float: right; font-size: 0.85em; color: var(--secondary-text);">
+                    Occupancy: {{ "{:.1f}%".format(month.metrics.occ_percent) }} | 
+                    Revenue: ${{ "{:,.0f}".format(month.metrics.forecast_rev) }}
+                </div>
+            </summary>
+            
+            <!-- Month Totals -->
+            <div class="monthly-totals-grid">
+                <div class="total-card">
+                    <h4>Month Occupancy</h4>
+                    <p>{{ "{:.1f}%".format(month.metrics.occ_percent) }}</p>
+                    <div class="metric-change {{ 'positive' if month.metrics.occ_vs_ly > 0 else 'negative' if month.metrics.occ_vs_ly < 0 else 'neutral' }}">
+                        {{ "{:+.1f}%".format(month.metrics.occ_vs_ly) }} vs LY
+                    </div>
+                </div>
+                <div class="total-card">
+                    <h4>Month Revenue</h4>
+                    <p>${{ "{:,.0f}".format(month.metrics.forecast_rev) }}</p>
+                </div>
+                <div class="total-card">
+                    <h4>Business Views</h4>
+                    <p>{{ month.children|length }}</p>
+                </div>
+            </div>
+
+            <!-- Business Views -->
+            <div class="business-view-section">
+                {% for view in month.children %}
+                <div class="business-view-details">
+                    <div class="business-view-summary">
+                        <span>🔹 {{ view.name }}</span>
+                        <div class="business-view-metrics">
+                            <span>Occupancy: {{ "{:.1f}%".format(view.metrics.occ_percent) }}</span>
+                            <span>Revenue: ${{ "{:,.0f}".format(view.metrics.forecast_rev) }}</span>
+                            <span>Days: {{ view.children|length }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endfor %}
+    </details>
+    {% endfor %}
+
+    <script>
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+            // Hide loading after 5 seconds (adjust as needed)
+            setTimeout(() => {
+                document.getElementById('loading').classList.remove('show');
+            }, 5000);
+        }
+
+        // Auto-hide loading when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('loading').classList.remove('show');
+        });
+    </script>
+</body>
+</html>
