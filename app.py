@@ -2,10 +2,20 @@ from flask import Flask, render_template, request, redirect, url_for, send_file
 import pandas as pd
 import os
 import traceback
+from pymongo import MongoClient
+from dotenv import load_dotenv
 import io
 
 app = Flask(__name__)
+load_dotenv()
 
+# --- Connect to MongoDB ---
+MONGO_URI = os.environ.get('MONGO_URI')
+if not MONGO_URI:
+    raise RuntimeError("MONGO_URI environment variable is not set.")
+client = MongoClient(MONGO_URI)
+db = client['hotel_dashboard_db']
+collection = db['reports']
 
 # --- !!! IMPORTANT CONFIGURATION !!! ---
 HOTEL_CAPACITY = {
@@ -25,6 +35,12 @@ def calculate_metrics(df, capacity_df):
         'occ_vs_ly': ((occ_ty - occ_ly) / occ_ly) * 100 if occ_ly else 0,
         'forecast_rev': merged_df['Forecasted Room Revenue This Year'].sum()
     }
+
+@app.route('/')
+def index():
+    """Renders the upload page."""
+    data_exists = collection.count_documents({}) > 0
+    return render_template('index.html', data_exists=data_exists)
 
 @app.route('/process', methods=['POST'])
 def process_file():
@@ -139,6 +155,35 @@ def download_report():
     except Exception as e:
         return f"An error occurred: {e}\n<pre>{traceback.format_exc()}</pre>", 500
 
+@app.route('/reset')
+def reset_data():
+    """Clears all data from the MongoDB collection."""
+    collection.delete_many({})
+    return redirect(url_for('index'))
+
+# if __name__ == '__main__':
+#     app.run(debug=True)
+# if __name__ == '__main__':
+#     # For Render deployment
+#     port = int(os.environ.get('PORT', 5001))
+#     app.run(host='0.0.0.0', port=port, debug=False)
+
+# if __name__ == '__main__':
+#     # For Render deployment
+#     port = int(os.environ.get('PORT', 5000))
+#     app.run(host='0.0.0.0', port=port, debug=False)
+
+# if __name__ == '__main__':
+#     app.run(debug=True)
+# if __name__ == '__main__':
+#     # For Render deployment
+#     port = int(os.environ.get('PORT', 5001))
+#     app.run(host='0.0.0.0', port=port, debug=False)
+
+# if __name__ == '__main__':
+#     # For Render deployment
+#     port = int(os.environ.get('PORT', 5000))
+#     app.run(host='0.0.0.0', port=port, debug=False)
 
 if __name__ == '__main__':
     # For Render deployment
