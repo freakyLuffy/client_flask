@@ -106,14 +106,14 @@
 
 <div class="upload-container">
     <h1>Generate Portfolio Report</h1>
-    <p>Upload a single Excel file (<b>.xlsx</b> or <b>.xls</b>) to generate your report.</p>
+    <p>Upload one or more Excel files (<b>.xlsx</b> or <b>.xls</b>) to generate your report.</p>
     <form id="upload-form">
         <div class="form-group">
             <label for="file" class="custom-file-upload">
-                Click to select an Excel file
-                <div id="file-name">No file chosen</div>
+                Click to select Excel file(s)
+                <div id="file-name">No files chosen</div>
             </label>
-            <input type="file" name="file" id="file" accept=".xlsx, .xls" required>
+            <input type="file" name="file" id="file" accept=".xlsx, .xls" required multiple>
         </div>
         <button type="submit">Upload & Generate Report</button>
     </form>
@@ -131,8 +131,13 @@
 document.getElementById('file').onchange = function () {
     const fileCount = this.files.length;
     const fileNameDisplay = document.getElementById('file-name');
-    if (fileCount === 0) { fileNameDisplay.textContent = "No file chosen"; } 
-    else { fileNameDisplay.textContent = this.files[0].name; }
+    if (fileCount === 0) {
+        fileNameDisplay.textContent = "No files chosen";
+    } else if (fileCount === 1) {
+        fileNameDisplay.textContent = this.files[0].name;
+    } else {
+        fileNameDisplay.textContent = `${fileCount} files selected`;
+    }
 };
 
 // This script handles the form submission and shows the processing overlay
@@ -142,12 +147,7 @@ document.getElementById('upload-form').onsubmit = function (e) {
     const files = document.getElementById('file').files;
 
     if (files.length === 0) {
-        alert("Please select an Excel file to upload.");
-        return;
-    }
-    if (files.length > 1) {
-        overlay.classList.remove('active');
-        alert("Please upload only one Excel file.");
+        alert("Please select at least one Excel file to upload.");
         return;
     }
 

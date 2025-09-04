@@ -235,7 +235,7 @@
         <div>
             <a href="/reset" onclick="return confirm('Are you sure you want to clear all data?')" 
                style="margin-right: 1em; color: #dc3545; text-decoration: none;">Clear Data</a>
-            <a href="/export-excel" class="export-btn" onclick="showLoading()">
+           <a href="{{ url_for('download_report') }}" class="export-btn" onclick="showLoading()"></a>
                 Export to Excel
             </a>
         </div>

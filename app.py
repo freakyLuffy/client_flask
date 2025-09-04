@@ -10,7 +10,7 @@ app = Flask(__name__)
 load_dotenv()
 
 # --- Connect to MongoDB ---
-MONGO_URI = os.environ.get('MONGO_URI')
+MONGO_URI = os.environ.get('MONGO_URI','mongodb+srv://freakyluffy:ronozoro@cluster0.vd8zb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
 if not MONGO_URI:
     raise RuntimeError("MONGO_URI environment variable is not set.")
 client = MongoClient(MONGO_URI)
@@ -46,9 +46,14 @@ def index():
 def process_file():
     """Clears old data, reads new files, saves to MongoDB, and redirects to the success page."""
     collection.delete_many({})
+    # --- ONLY CHANGE IS HERE ---
+    # Use .getlist() to handle one or more uploaded files
     uploaded_files = request.files.getlist("file")
+    
     if not uploaded_files or all(f.filename == '' for f in uploaded_files):
         return "Error: No files were selected.", 400
+        
+    # The rest of the function works as is, because it already loops through the files
     for file in uploaded_files:
         if file and (file.filename.lower().endswith('.xlsx') or file.filename.lower().endswith('.xls')):
             try:
@@ -139,7 +144,6 @@ def download_report():
                 if level > 0:
                     worksheet.row_dimensions[i + 2].outline_level = level
             
-            # *** NEW: Tell Excel to open with the groups collapsed ***
             # This ensures the summary (parent) row is shown above its children
             worksheet.sheet_properties.outlinePr.summaryBelow = False
 
@@ -161,29 +165,6 @@ def reset_data():
     collection.delete_many({})
     return redirect(url_for('index'))
 
-# if __name__ == '__main__':
-#     app.run(debug=True)
-# if __name__ == '__main__':
-#     # For Render deployment
-#     port = int(os.environ.get('PORT', 5001))
-#     app.run(host='0.0.0.0', port=port, debug=False)
-
-# if __name__ == '__main__':
-#     # For Render deployment
-#     port = int(os.environ.get('PORT', 5000))
-#     app.run(host='0.0.0.0', port=port, debug=False)
-
-# if __name__ == '__main__':
-#     app.run(debug=True)
-# if __name__ == '__main__':
-#     # For Render deployment
-#     port = int(os.environ.get('PORT', 5001))
-#     app.run(host='0.0.0.0', port=port, debug=False)
-
-# if __name__ == '__main__':
-#     # For Render deployment
-#     port = int(os.environ.get('PORT', 5000))
-#     app.run(host='0.0.0.0', port=port, debug=False)
 
 if __name__ == '__main__':
     # For Render deployment
