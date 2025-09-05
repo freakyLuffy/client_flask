@@ -22,18 +22,60 @@ HOTEL_CAPACITY = {
     "The Hyde Dubai (HB8Y1)": 350,
 }
 
+from flask import Flask, render_template, request, redirect, url_for, send_file
+import pandas as pd
+import os
+import traceback
+from pymongo import MongoClient
+from dotenv import load_dotenv
+import io
+
+app = Flask(__name__)
+load_dotenv()
+
+# --- Connect to MongoDB ---
+MONGO_URI = os.environ.get('MONGO_URI')
+if not MONGO_URI:
+    raise RuntimeError("MONGO_URI environment variable is not set.")
+client = MongoClient(MONGO_URI)
+db = client['hotel_dashboard_db']
+collection = db['reports']
+
+# --- !!! IMPORTANT CONFIGURATION !!! ---
+HOTEL_CAPACITY = {
+    "The Hyde Dubai (HB8Y1)": 350,
+}
+
 def calculate_metrics(df, capacity_df):
     """Helper function to calculate metrics for any given subset of data."""
     if df.empty:
-        return {'occ_percent': 0, 'occ_vs_ly': 0, 'forecast_rev': 0}
-    merged_df = df.merge(capacity_df, on=['Property Name', 'Occupancy Date'], how='left')
-    total_available_rooms = merged_df['capacity'].sum()
-    occ_ty = merged_df['Occupancy On Books This Year'].sum()
-    occ_ly = merged_df['Occupancy On Books STLY'].sum()
+        return {
+            'occ_ty': 0, 'occ_ly': 0, 'occ_diff': 0, 'occ_st2y': 0, 'occ_forecast': 0,
+            'booked_rev_ty': 0, 'booked_rev_ly': 0, 'booked_rev_diff': 0, 'booked_rev_st2y': 0,
+            'forecast_rev_ty': 0
+        }
+    
+    # Sum all the required metrics
+    occ_ty = df['Occupancy On Books This Year'].sum()
+    occ_ly = df['Occupancy On Books STLY'].sum()
+    occ_st2y = df['Occupancy On Books ST2Y'].sum()
+    occ_forecast = df['Occupancy Forecast This Year'].sum()
+    booked_rev_ty = df['Booked Room Revenue This Year'].sum()
+    booked_rev_ly = df['Booked Room Revenue STLY'].sum()
+    booked_rev_st2y = df['Booked Room Revenue ST2Y'].sum()
+    forecast_rev_ty = df['Forecasted Room Revenue This Year'].sum()
+    
     return {
-        'occ_percent': (occ_ty / total_available_rooms) * 100 if total_available_rooms else 0,
-        'occ_vs_ly': ((occ_ty - occ_ly) / occ_ly) * 100 if occ_ly else 0,
-        'forecast_rev': merged_df['Forecasted Room Revenue This Year'].sum()
+        'occ_ty': occ_ty,
+        'occ_ly': occ_ly,
+        'occ_diff': occ_ty - occ_ly,
+        'occ_st2y': occ_st2y,
+        'occ_forecast': occ_forecast,
+        'booked_rev_ty': booked_rev_ty,
+        'booked_rev_ly': booked_rev_ly,
+        'booked_rev_diff': booked_rev_ty - booked_rev_ly,
+        'booked_rev_st2y': booked_rev_st2y,
+        'forecast_rev_ty': forecast_rev_ty
     }
 
 @app.route('/')
@@ -72,16 +114,26 @@ def success():
     return render_template('success.html')
 
 def flatten_hierarchy_for_excel(item, level=0, output_list=None):
-    """Recursively flattens data and includes the hierarchy level for each row."""
+    """Recursively flattens data and includes the hierarchy level for each row with 12 columns."""
     if output_list is None:
         output_list = []
     
+    metrics = item['metrics']
     output_list.append((
         {
-            '': item['name'],
-            'Occupancy on Books': f"{item['metrics']['occ_percent']:.1f}%",
-            'Occupancy vs. Last Year': f"{item['metrics']['occ_vs_ly']:+.1f}%",
-            'Total Forecasted Room Rev': f"${item['metrics']['forecast_rev']:,.0f}"
+            '': item['name'],  # Column A
+            'Occupancy On Books This Year': metrics['occ_ty'],  # Column B
+            'Occupancy On Books STLY': metrics['occ_ly'],  # Column C
+            'Difference (TY-LY)': metrics['occ_diff'],  # Column D
+            'Occupancy On Books ST2Y': metrics['occ_st2y'],  # Column E
+            'Occupancy Forecast This Year': metrics['occ_forecast'],  # Column F
+            'Empty Column 1': '',  # Column G (empty)
+            'Booked Room Revenue This Year': metrics['booked_rev_ty'],  # Column H
+            'Booked Room Revenue STLY': metrics['booked_rev_ly'],  # Column I
+            'Revenue Difference (TY-LY)': metrics['booked_rev_diff'],  # Column J
+            'Booked Room Revenue ST2Y': metrics['booked_rev_st2y'],  # Column K
+            'Forecasted Room Revenue This Year': metrics['forecast_rev_ty'],  # Column L
+            'Empty Column 2': ''  # Column M (empty)
         },
         level
     ))
@@ -99,13 +151,25 @@ def download_report():
         return "No data found to generate a report.", 404
 
     try:
-        # --- (Data processing logic remains the same) ---
+        # --- Data processing logic ---
         df['Occupancy Date'] = pd.to_datetime(df['Occupancy Date'])
-        numeric_cols = ['Occupancy On Books This Year', 'Occupancy On Books STLY', 'Forecasted Room Revenue This Year']
+        
+        # Define all numeric columns that need to be processed
+        numeric_cols = [
+            'Occupancy On Books This Year', 'Occupancy On Books STLY', 'Occupancy On Books ST2Y',
+            'Booked Room Revenue This Year', 'Booked Room Revenue STLY', 'Booked Room Revenue ST2Y',
+            'Forecasted Room Revenue This Year', 'Occupancy Forecast This Year'
+        ]
+        
         for col in numeric_cols:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            else:
+                df[col] = 0  # Add missing columns with zero values
+        
         df['Month'] = df['Occupancy Date'].dt.strftime('%B')
         df['Day'] = df['Occupancy Date'].dt.strftime('%b %d')
+        
         capacity_df = pd.DataFrame(list(HOTEL_CAPACITY.items()), columns=['Property Name', 'capacity_per_day'])
         date_range = pd.date_range(df['Occupancy Date'].min(), df['Occupancy Date'].max(), name='Occupancy Date')
         capacity_by_date = pd.MultiIndex.from_product([capacity_df['Property Name'], date_range], names=['Property Name', 'Occupancy Date']).to_frame(index=False)
@@ -150,7 +214,7 @@ def download_report():
             # Auto-adjust column widths
             for column_cells in worksheet.columns:
                 length = max(len(str(cell.value)) for cell in column_cells)
-                worksheet.column_dimensions[column_cells[0].column_letter].width = length + 2
+                worksheet.column_dimensions[column_cells[0].column_letter].width = max(length + 2, 15)
         
         output.seek(0)
         
